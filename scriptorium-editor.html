@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scriptorium Editor</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0f2419;
+  --surface:  #162e1f;
+  --card:     #1b4535;
+  --border:   #2d6b52;
+  --accent:   #3d7a5f;
+  --accent2:  #4d9070;
+  --gold:     #c8a878;
+  --text:     #e8e0d5;
+  --muted:    #6a9a7a;
+  --dim:      #4a6a5a;
+  --live:     #52B788;
+  --live-bg:  #0d2a1a;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+header {
+  background: var(--card);
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+header h1 { font-size: 16px; color: var(--gold); font-weight: 700; flex: 1; letter-spacing: 0.5px; }
+.file-info { font-size: 11px; color: var(--muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hbtn {
+  background: var(--accent);
+  color: var(--text);
+  border: none;
+  padding: 6px 13px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.hbtn:hover { background: var(--accent2); }
+.hbtn.primary { background: var(--gold); color: var(--card); font-weight: 700; }
+.hbtn.primary:hover { background: #d4b88a; }
+.hbtn.live-btn { background: var(--live-bg); color: var(--live); border: 1px solid #1e4a30; }
+.hbtn.live-btn:hover { background: #122a1c; }
+.hbtn.live-btn.active { background: #0d3320; border-color: var(--live); color: var(--live); }
+
+/* ── Connection bar ──────────────────────────────────────────────── */
+.conn-bar {
+  display: none;
+  background: #0d2218;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.conn-bar.show { display: flex; }
+.conn-bar label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.conn-bar input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  width: 220px;
+  outline: none;
+  font-family: monospace;
+}
+.conn-bar input:focus { border-color: var(--live); }
+.conn-pill {
+  font-size: 10px;
+  padding: 3px 9px;
+  border-radius: 10px;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.conn-pill.connected { background: #0d3320; color: var(--live); }
+.conn-pill.error { background: #3d1010; color: #c87878; }
+.conn-pill.checking { background: #2a2510; color: var(--gold); }
+.conn-adb { font-size: 10px; color: var(--dim); margin-left: auto; font-family: monospace; white-space: nowrap; }
+.conn-adb code { color: #8acfa8; }
+
+/* ── Layout ──────────────────────────────────────────────────────── */
+.layout { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Sidebar ─────────────────────────────────────────────────────── */
+.sidebar {
+  width: 260px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.sidebar-top {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sidebar-top span { font-size: 12px; color: var(--muted); flex: 1; }
+.sidebar-top .live-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--live);
+  animation: pulse 1.5s infinite;
+  flex-shrink: 0;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.add-btn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+}
+.add-btn:hover { background: var(--accent2); }
+
+/* Search */
+.search-wrap { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.search-wrap input {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+}
+.search-wrap input::placeholder { color: var(--dim); }
+
+.note-list { flex: 1; overflow-y: auto; padding: 6px; }
+.note-list::-webkit-scrollbar { width: 3px; }
+.note-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.note-item {
+  padding: 8px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  margin-bottom: 3px;
+  border: 1px solid transparent;
+  transition: all .12s;
+  position: relative;
+}
+.note-item:hover { background: #1e3d2a; }
+.note-item.active { background: var(--card); border-color: var(--accent); }
+.note-item .nt { font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note-item .nd { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+/* ── Editor area ─────────────────────────────────────────────────── */
+.editor-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--dim);
+}
+.empty-state .ei { font-size: 48px; }
+.empty-state p { font-size: 13px; text-align: center; line-height: 1.7; }
+.empty-state .es-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+
+.editor-wrap {
+  display: none;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+.editor-wrap.show { display: flex; }
+
+/* Title bar */
+.title-bar {
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#noteTitle {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 700;
+  outline: none;
+}
+#noteTitle::placeholder { color: var(--dim); }
+.del-btn {
+  background: transparent;
+  border: 1px solid #8b3a3a;
+  color: #c87878;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.del-btn:hover { background: #8b3a3a; color: white; }
+
+/* ── Toolbar ─────────────────────────────────────────────────────── */
+.toolbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+.tb {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  padding: 0;
+  width: 32px; height: 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .1s;
+  flex-shrink: 0;
+}
+.tb:hover { background: var(--card); color: var(--text); }
+.tb.active { background: #2a5040; border-color: var(--accent); color: #7de8b0; }
+.tb svg { width: 16px; height: 16px; fill: currentColor; }
+.tsep { width: 1px; height: 22px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
+
+/* Color palette (hidden by default) */
+.color-palette {
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 2px 2px;
+  border-top: 1px solid var(--border);
+  align-items: center;
+}
+.color-palette.show { display: flex; }
+.color-palette label { font-size: 10px; color: var(--dim); margin-right: 2px; }
+.cdot {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform .1s, border-color .1s;
+  flex-shrink: 0;
+}
+.cdot:hover { transform: scale(1.15); }
+.cdot.selected { border-color: white; transform: scale(1.1); }
+.cdot.clear {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--muted);
+}
+.cdot.clear:hover { border-color: var(--text) !important; }
+
+/* ── Rich editor ─────────────────────────────────────────────────── */
+.rich-editor {
+  flex: 1;
+  padding: 18px 22px;
+  overflow-y: auto;
+  outline: none;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--text);
+  caret-color: var(--gold);
+}
+.rich-editor::-webkit-scrollbar { width: 4px; }
+.rich-editor::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.rich-editor:empty:before {
+  content: attr(data-placeholder);
+  color: var(--dim);
+  pointer-events: none;
+}
+.rich-editor ul { margin-left: 22px; }
+.rich-editor ol { margin-left: 22px; }
+.rich-editor li { margin: 2px 0; }
+.rich-editor b, .rich-editor strong { color: inherit; }
+
+/* Status bar */
+.statusbar {
+  padding: 4px 18px;
+  font-size: 10px;
+  color: var(--dim);
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 16px;
+  flex-shrink: 0;
+}
+#saveStatus.dirty { color: var(--gold); }
+#saveStatus.live-saving { color: var(--live); }
+
+/* ── Drop overlay ────────────────────────────────────────────────── */
+.drop-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(15,36,25,.88);
+  z-index: 100;
+  align-items: center; justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 18px; color: var(--gold);
+}
+.drop-overlay.show { display: flex; }
+.drop-overlay .di { font-size: 56px; }
+
+/* ── Toast ───────────────────────────────────────────────────────── */
+.toast {
+  position: fixed; bottom: 20px; right: 20px;
+  background: var(--accent);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 7px;
+  font-size: 12px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: all .25s;
+  z-index: 200;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.live { background: #0d3320; border: 1px solid var(--live); color: var(--live); }
+
+/* ── Loading spinner (inline) ────────────────────────────────────── */
+.spinner {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--live);
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="drop-overlay" id="dropOverlay">
+  <div class="di">📂</div>
+  <div>Drop JSON backup file here</div>
+</div>
+<div class="toast" id="toast"></div>
+<input type="file" id="fileInput" accept=".json" style="display:none" onchange="loadFile(this)">
+
+<!-- Header -->
+<header>
+  <h1>✒ Scriptorium Editor</h1>
+  <span class="file-info" id="fileInfo"></span>
+  <button class="hbtn live-btn" id="liveModeBtn" onclick="toggleConnBar()" title="Connect directly to phone via ADB">🔌 Live</button>
+  <button class="hbtn" onclick="openFile()" id="openFileBtn">📂 Open JSON</button>
+  <button class="hbtn" id="saveBtn" onclick="saveToFile()" style="display:none">💾 Save</button>
+  <button class="hbtn primary" onclick="exportJSON()">⬇ Export Copy</button>
+</header>
+
+<!-- Live Connection Bar -->
+<div class="conn-bar" id="connBar">
+  <label>Device URL:</label>
+  <input type="text" id="connUrl" value="http://localhost:8765" placeholder="http://localhost:8765"
+         onkeydown="if(event.key==='Enter') connectDevice()">
+  <button class="hbtn" id="connectBtn" onclick="connectDevice()">Connect</button>
+  <button class="hbtn" id="disconnectBtn" onclick="disconnectDevice()" style="display:none; background:#3d1a1a; color:#c87878;">Disconnect</button>
+  <span class="conn-pill" id="connPill"></span>
+  <span class="conn-adb">
+    <span style="color:var(--dim)">Run first: </span><code>adb forward tcp:8765 tcp:8765</code>
+  </span>
+</div>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-top">
+      <div class="live-dot" id="liveDot" style="display:none"></div>
+      <span id="noteCount">No file loaded</span>
+      <button class="add-btn" onclick="addNote()" title="New note (⌘N)">+</button>
+    </div>
+    <div class="search-wrap">
+      <input type="text" id="searchInput" placeholder="Search notes…" oninput="filterNotes()">
+    </div>
+    <div class="note-list" id="noteList"></div>
+  </div>
+
+  <!-- Editor -->
+  <div class="editor-area">
+    <div class="empty-state" id="emptyState">
+      <div class="ei">✒</div>
+      <p id="emptyMsg">Load a JSON backup or connect directly<br>to your phone via ADB.</p>
+      <div class="es-actions">
+        <button class="hbtn" onclick="openFile()">📂 Open JSON</button>
+        <button class="hbtn live-btn" onclick="toggleConnBar()">🔌 Live Connect</button>
+      </div>
+    </div>
+
+    <div class="editor-wrap" id="editorWrap">
+      <!-- Title -->
+      <div class="title-bar">
+        <input type="text" id="noteTitle" placeholder="Note title…" oninput="markDirty()">
+        <button class="del-btn" onclick="deleteCurrentNote()">🗑 Delete</button>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="toolbar-row" id="mainToolbar">
+          <button class="tb" id="btn-bold" title="Bold (⌘B)" onclick="applyFmt('bold')"><b>B</b></button>
+          <button class="tb" id="btn-italic" title="Italic (⌘I)" onclick="applyFmt('italic')"><i>I</i></button>
+          <button class="tb" id="btn-underline" title="Underline (⌘U)" onclick="applyFmt('underline')"><u>U</u></button>
+          <button class="tb" id="btn-strike" title="Strikethrough" onclick="applyFmt('strikeThrough')"><s>S</s></button>
+          <div class="tsep"></div>
+          <button class="tb" id="btn-heading" title="Heading (20px Bold)" onclick="applyHeading()" style="font-size:15px;font-weight:700;">H</button>
+          <div class="tsep"></div>
+          <button class="tb" id="btn-color" title="Text Color" onclick="togglePalette('color')" style="font-size:15px;">A</button>
+          <button class="tb" id="btn-highlight" title="Highlight" onclick="togglePalette('highlight')" style="font-size:15px;">🖊</button>
+          <div class="tsep"></div>
+          <button class="tb" id="btn-ul" title="Bullet List" onclick="applyFmt('insertUnorderedList')">
+            <svg viewBox="0 0 24 24"><path d="M4 6h2v2H4zm0 5h2v2H4zm0 5h2v2H4zM8 7h12v2H8zm0 5h12v2H8zm0 5h12v2H8z"/></svg>
+          </button>
+          <button class="tb" id="btn-ol" title="Numbered List" onclick="applyFmt('insertOrderedList')">
+            <svg viewBox="0 0 24 24"><path d="M2 17h2v.5H3v1h1v.5H2v1h3v-4H2zm1-9h1V4H2v1h1zm-1 3h1.8L2 13.1v.9h3v-1H3.2L5 10.9V10H2zm5-5v2h14V6zm0 14h14v-2H7zm0-6h14v-2H7z"/></svg>
+          </button>
+          <div class="tsep"></div>
+          <button class="tb" title="Clear Formatting" onclick="clearFmt()">
+            <svg viewBox="0 0 24 24"><path d="M3.27 5L2 6.27l6.97 6.97L6.5 19h3l1.57-3.66L16.73 21 18 19.73 3.27 5zm13.85-2L12 8.12 7.88 4 6.44 5.44 10.56 9.56 6.88 13H5v2h3.12l-2 4.71 1.41 1.41L9.88 17H11v-1.12l3.56-3.56 4.12 4.12L20 15.15 17.12 12.27 20.56 8.83 19.12 7.39 15.68 10.83 13.12 8.27 17.12 4.27 15.12 3z"/></svg>
+          </button>
+        </div>
+
+        <!-- Text Color Palette -->
+        <div class="color-palette" id="colorPalette">
+          <label>Text Color:</label>
+          <div class="cdot clear" onclick="clearColor()" title="Remove color">✕</div>
+          <div class="cdot" style="background:#1C2B22" onclick="applyColor('#1C2B22')"></div>
+          <div class="cdot" style="background:#2D6A4F" onclick="applyColor('#2D6A4F')"></div>
+          <div class="cdot" style="background:#52B788" onclick="applyColor('#52B788')"></div>
+          <div class="cdot" style="background:#D4A853" onclick="applyColor('#D4A853')"></div>
+          <div class="cdot" style="background:#B5451B" onclick="applyColor('#B5451B')"></div>
+          <div class="cdot" style="background:#E07B39" onclick="applyColor('#E07B39')"></div>
+          <div class="cdot" style="background:#1565C0" onclick="applyColor('#1565C0')"></div>
+          <div class="cdot" style="background:#6A1B9A" onclick="applyColor('#6A1B9A')"></div>
+          <div class="cdot" style="background:#00695C" onclick="applyColor('#00695C')"></div>
+          <div class="cdot" style="background:#757575" onclick="applyColor('#757575')"></div>
+        </div>
+
+        <!-- Highlight Palette -->
+        <div class="color-palette" id="highlightPalette">
+          <label>Highlight:</label>
+          <div class="cdot clear" onclick="clearHighlight()" title="Remove highlight">✕</div>
+          <div class="cdot" style="background:#FFFF66" onclick="applyHighlight('#FFFF66')"></div>
+          <div class="cdot" style="background:#90EE90" onclick="applyHighlight('#90EE90')"></div>
+          <div class="cdot" style="background:#FFB3BA" onclick="applyHighlight('#FFB3BA')"></div>
+          <div class="cdot" style="background:#ADD8FF" onclick="applyHighlight('#ADD8FF')"></div>
+          <div class="cdot" style="background:#FFCC80" onclick="applyHighlight('#FFCC80')"></div>
+          <div class="cdot" style="background:#E1BEE7" onclick="applyHighlight('#E1BEE7')"></div>
+          <div class="cdot" style="background:#B2DFDB" onclick="applyHighlight('#B2DFDB')"></div>
+          <div class="cdot" style="background:#FFF9C4" onclick="applyHighlight('#FFF9C4')"></div>
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div class="rich-editor" id="richEditor"
+           contenteditable="true"
+           data-placeholder="Start writing…"
+           onkeydown="handleEditorKey(event)"
+           oninput="onEditorInput()">
+      </div>
+
+      <div class="statusbar">
+        <span id="wordCount">0 words</span>
+        <span id="saveStatus">Saved</span>
+        <span id="noteDate"></span>
+        <span id="modeLabel" style="margin-left:auto"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════════════════════
+let backup      = null;       // { notes: [...], tags, highlights, youtubeLinks, noteTags }
+let currentIndex = -1;        // index in backup.notes  (JSON mode)
+let currentNoteId = null;     // note id                (Live mode)
+let isDirty     = false;
+let nextId      = 1000000;
+let searchTerm  = '';
+let activePalette = null;
+let savedRange  = null;
+let fileHandle  = null;       // File System Access API handle
+let autoSaveTimer = null;
+
+// Live mode
+let mode       = 'json';       // 'json' | 'live'
+let liveApiBase = 'http://localhost:8765';
+let liveConnected = false;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LIVE CONNECTION
+// ══════════════════════════════════════════════════════════════════════════════
+
+function toggleConnBar() {
+  const bar = document.getElementById('connBar');
+  const btn = document.getElementById('liveModeBtn');
+  const isOpen = bar.classList.contains('show');
+  bar.classList.toggle('show', !isOpen);
+  btn.classList.toggle('active', !isOpen);
+}
+
+async function connectDevice() {
+  const url = document.getElementById('connUrl').value.trim().replace(/\/+$/, '');
+  liveApiBase = url;
+  setPill('checking', '⌛ Connecting…');
+
+  try {
+    const res = await fetch(liveApiBase + '/api/ping', { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    liveConnected = true;
+    mode = 'live';
+
+    setPill('connected', '🟢 Connected');
+    document.getElementById('connectBtn').style.display = 'none';
+    document.getElementById('disconnectBtn').style.display = '';
+    document.getElementById('connUrl').disabled = true;
+    document.getElementById('liveDot').style.display = '';
+    document.getElementById('liveModeBtn').classList.add('active');
+    document.getElementById('modeLabel').textContent = '🔌 Live';
+    document.getElementById('openFileBtn').style.display = 'none';
+    document.getElementById('saveBtn').style.display = 'none';
+
+    toast('🔌 Connected to ' + (data.app || 'device'), 'live');
+    await liveLoadNotes();
+  } catch (e) {
+    liveConnected = false;
+    setPill('error', '❌ ' + (e.name === 'TimeoutError' ? 'Timeout' : 'Failed'));
+    toast('❌ Cannot reach device. Run: adb forward tcp:8765 tcp:8765');
+  }
+}
+
+function disconnectDevice() {
+  liveConnected = false;
+  mode = 'json';
+  backup = null;
+  currentIndex = -1;
+  currentNoteId = null;
+
+  setPill('', '');
+  document.getElementById('connectBtn').style.display = '';
+  document.getElementById('disconnectBtn').style.display = 'none';
+  document.getElementById('connUrl').disabled = false;
+  document.getElementById('liveDot').style.display = 'none';
+  document.getElementById('liveModeBtn').classList.remove('active');
+  document.getElementById('modeLabel').textContent = '';
+  document.getElementById('openFileBtn').style.display = '';
+
+  document.getElementById('editorWrap').classList.remove('show');
+  document.getElementById('emptyState').style.display = '';
+  document.getElementById('noteList').innerHTML = '';
+  document.getElementById('noteCount').textContent = 'Disconnected';
+  document.getElementById('fileInfo').textContent = '';
+  toast('Disconnected');
+}
+
+function setPill(state, text) {
+  const pill = document.getElementById('connPill');
+  pill.className = 'conn-pill' + (state ? ' ' + state : '');
+  pill.textContent = text;
+}
+
+async function liveLoadNotes() {
+  const res = await fetch(liveApiBase + '/api/notes');
+  const notes = await res.json();
+  backup = {
+    version: 1,
+    exportDate: Date.now(),
+    notes: notes.map(n => ({ id: n.id, title: n.title || '', content: '', updatedAt: n.updatedAt, createdAt: n.createdAt, isFavorite: n.isFavorite })),
+    tags: [], highlights: [], youtubeLinks: [], noteTags: []
+  };
+  document.getElementById('fileInfo').textContent = '🔌 Live · ' + notes.length + ' notes';
+  renderList();
+  if (notes.length > 0) await liveSelectNote(backup.notes[0].id);
+}
+
+async function liveSelectNote(id) {
+  if (isDirty) await liveSaveCurrentNote();
+
+  const res = await fetch(liveApiBase + '/api/notes/' + id);
+  if (!res.ok) { toast('❌ Could not load note'); return; }
+  const note = await res.json();
+
+  // update local cache with full content
+  const cached = backup.notes.find(n => n.id === id);
+  if (cached) { cached.content = note.content; cached.title = note.title; }
+
+  currentNoteId = id;
+  currentIndex = backup.notes.findIndex(n => n.id === id);
+
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('editorWrap').classList.add('show');
+  document.getElementById('noteTitle').value = note.title || '';
+  document.getElementById('richEditor').innerHTML = note.content || '';
+  document.getElementById('noteDate').textContent = 'Updated: ' + fmtDate(note.updatedAt);
+  isDirty = false;
+  setStatus('Saved', false);
+  updateWordCount();
+  renderList();
+  closePalette();
+}
+
+async function liveSaveCurrentNote() {
+  if (!currentNoteId) return;
+  const title = document.getElementById('noteTitle').value.trim() || 'Untitled';
+  const content = document.getElementById('richEditor').innerHTML;
+  setStatus('⌛ Saving…', false, 'live-saving');
+  try {
+    const res = await fetch(liveApiBase + '/api/notes/' + currentNoteId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, content })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const updated = await res.json();
+    const cached = backup.notes.find(n => n.id === currentNoteId);
+    if (cached) { cached.title = title; cached.content = content; cached.updatedAt = updated.updatedAt; }
+    isDirty = false;
+    setStatus('✓ Saved to device', false);
+    renderList();
+    toast('✓ Saved to device', 'live');
+  } catch(e) {
+    setStatus('❌ Save failed', true);
+    toast('❌ Save failed: ' + e.message);
+  }
+}
+
+async function liveAddNote() {
+  if (isDirty) await liveSaveCurrentNote();
+  try {
+    const res = await fetch(liveApiBase + '/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Yeni Not', content: '' })
+    });
+    const note = await res.json();
+    backup.notes.unshift({ id: note.id, title: note.title, content: '', updatedAt: note.updatedAt, createdAt: note.createdAt });
+    document.getElementById('fileInfo').textContent = '🔌 Live · ' + backup.notes.length + ' notes';
+    renderList();
+    await liveSelectNote(note.id);
+    setTimeout(() => { const t = document.getElementById('noteTitle'); t.focus(); t.select(); }, 50);
+    toast('✓ Note created on device', 'live');
+  } catch(e) {
+    toast('❌ Could not create note: ' + e.message);
+  }
+}
+
+async function liveDeleteCurrentNote() {
+  if (!currentNoteId) return;
+  const cached = backup.notes.find(n => n.id === currentNoteId);
+  const title = cached?.title || 'Untitled';
+  if (!confirm(`Delete "${title}" from device?`)) return;
+  try {
+    await fetch(liveApiBase + '/api/notes/' + currentNoteId, { method: 'DELETE' });
+    backup.notes = backup.notes.filter(n => n.id !== currentNoteId);
+    currentNoteId = null;
+    currentIndex = -1;
+    isDirty = false;
+    document.getElementById('fileInfo').textContent = '🔌 Live · ' + backup.notes.length + ' notes';
+    if (backup.notes.length === 0) {
+      document.getElementById('editorWrap').classList.remove('show');
+      document.getElementById('emptyState').style.display = '';
+    } else {
+      await liveSelectNote(backup.notes[0].id);
+    }
+    renderList();
+    toast('🗑 Deleted from device', 'live');
+  } catch(e) {
+    toast('❌ Delete failed: ' + e.message);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FILE SYSTEM ACCESS API (JSON mode)
+// ══════════════════════════════════════════════════════════════════════════════
+const hasFileAPI = 'showOpenFilePicker' in window;
+
+async function openFile() {
+  if (hasFileAPI) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+      });
+      fileHandle = handle;
+      const file = await handle.getFile();
+      const text = await file.text();
+      initBackup(JSON.parse(text), file.name);
+      document.getElementById('saveBtn').style.display = '';
+      toast('✓ Opened — changes auto-save to file');
+    } catch (e) {
+      if (e.name !== 'AbortError') toast('❌ Could not open file');
+    }
+  } else {
+    document.getElementById('fileInput').click();
+  }
+}
+
+async function saveToFile() {
+  if (!backup) return;
+  if (isDirty) saveNow();
+  if (fileHandle) {
+    try {
+      const writable = await fileHandle.createWritable();
+      await writable.write(JSON.stringify(backup, null, 2));
+      await writable.close();
+      toast('✓ Saved to file');
+      persistToLocalStorage();
+    } catch (e) { toast('❌ Save failed: ' + e.message); }
+  } else {
+    exportJSON();
+  }
+}
+
+function scheduleAutoSave() {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(async () => {
+    if (!isDirty) return;
+    if (mode === 'live') {
+      await liveSaveCurrentNote();
+    } else {
+      saveNow();
+      if (fileHandle) await saveToFile();
+      else persistToLocalStorage();
+    }
+  }, 8000);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// localStorage persistence
+// ══════════════════════════════════════════════════════════════════════════════
+function persistToLocalStorage() {
+  if (!backup || mode === 'live') return;
+  try {
+    localStorage.setItem('scr_backup', JSON.stringify(backup));
+    localStorage.setItem('scr_backup_time', Date.now());
+    localStorage.setItem('scr_backup_name', document.getElementById('fileInfo').textContent);
+    localStorage.setItem('scr_current_idx', currentIndex);
+  } catch(e) {}
+}
+
+function checkLocalStorage() {
+  const saved = localStorage.getItem('scr_backup');
+  if (!saved) return;
+  const time = localStorage.getItem('scr_backup_time');
+  const name = localStorage.getItem('scr_backup_name') || 'unknown file';
+  const ago  = time ? Math.round((Date.now() - Number(time)) / 60000) : '?';
+  const msg  = `Found unsaved session from ${ago} min ago (${name}).\n\nRestore it?`;
+  if (confirm(msg)) {
+    try {
+      const b = JSON.parse(saved);
+      const idx = parseInt(localStorage.getItem('scr_current_idx') || '0');
+      initBackup(b, name);
+      if (b.notes.length > 0) selectNote(Math.min(idx, b.notes.length - 1));
+      toast('✓ Session restored from browser storage');
+    } catch(e) { toast('❌ Could not restore session'); }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FILE LOADING (fallback)
+// ══════════════════════════════════════════════════════════════════════════════
+function loadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try { initBackup(JSON.parse(e.target.result), file.name); }
+    catch { toast('❌ Invalid JSON file'); }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function initBackup(data, name) {
+  backup = data;
+  if (!backup.notes)        backup.notes = [];
+  if (!backup.tags)         backup.tags = [];
+  if (!backup.highlights)   backup.highlights = [];
+  if (!backup.youtubeLinks) backup.youtubeLinks = [];
+  if (!backup.noteTags)     backup.noteTags = [];
+  nextId = backup.notes.length ? Math.max(...backup.notes.map(n => n.id)) + 1 : 1000000;
+  mode = 'json';
+  document.getElementById('fileInfo').textContent = name;
+  document.getElementById('modeLabel').textContent = '';
+  renderList();
+  toast('✓ Loaded — ' + backup.notes.length + ' notes');
+  if (backup.notes.length > 0) selectNote(0);
+  persistToLocalStorage();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DRAG & DROP
+// ══════════════════════════════════════════════════════════════════════════════
+const overlay = document.getElementById('dropOverlay');
+document.addEventListener('dragover', e => { e.preventDefault(); overlay.classList.add('show'); });
+document.addEventListener('dragleave', e => { if (!e.relatedTarget) overlay.classList.remove('show'); });
+document.addEventListener('drop', e => {
+  e.preventDefault(); overlay.classList.remove('show');
+  const file = e.dataTransfer.files[0];
+  if (!file || !file.name.endsWith('.json')) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      initBackup(data, file.name);
+    } catch { toast('❌ Invalid JSON file'); }
+  };
+  r.readAsText(file);
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NOTE LIST
+// ══════════════════════════════════════════════════════════════════════════════
+function renderList() {
+  const list  = document.getElementById('noteList');
+  const count = document.getElementById('noteCount');
+  if (!backup) { count.textContent = 'No file loaded'; list.innerHTML = ''; return; }
+
+  const filtered = backup.notes.filter((n, i) => {
+    n._idx = i;
+    if (!searchTerm) return true;
+    return (n.title || '').toLowerCase().includes(searchTerm) ||
+           stripHtml(n.content || '').toLowerCase().includes(searchTerm);
+  });
+
+  count.textContent = backup.notes.length + ' note' + (backup.notes.length !== 1 ? 's' : '');
+  list.innerHTML = '';
+
+  filtered.forEach(note => {
+    const i = note._idx;
+    const isActive = mode === 'live' ? note.id === currentNoteId : i === currentIndex;
+    const div = document.createElement('div');
+    div.className = 'note-item' + (isActive ? ' active' : '');
+    div.onclick = () => {
+      if (mode === 'live') { liveSelectNote(note.id); }
+      else { if (isDirty) saveNow(); selectNote(i); }
+    };
+    const date    = fmtDate(note.updatedAt);
+    const preview = stripHtml(note.content || '').slice(0, 60);
+    div.innerHTML = `<div class="nt">${esc(note.title || 'Untitled')}</div>
+                     <div class="nd">${date}${preview ? ' · ' + esc(preview) : ''}</div>`;
+    list.appendChild(div);
+  });
+}
+
+function filterNotes() {
+  searchTerm = document.getElementById('searchInput').value.toLowerCase();
+  renderList();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SELECT / ADD / DELETE (JSON mode)
+// ══════════════════════════════════════════════════════════════════════════════
+function selectNote(index) {
+  if (!backup || index < 0 || index >= backup.notes.length) return;
+  currentIndex = index;
+  const note = backup.notes[index];
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('editorWrap').classList.add('show');
+  document.getElementById('noteTitle').value = note.title || '';
+  document.getElementById('richEditor').innerHTML = note.content || '';
+  document.getElementById('noteDate').textContent = 'Updated: ' + fmtDate(note.updatedAt);
+  isDirty = false;
+  setStatus('Saved', false);
+  updateWordCount();
+  renderList();
+  closePalette();
+}
+
+function addNote() {
+  if (mode === 'live') { liveAddNote(); return; }
+  if (!backup) {
+    backup = { version: 1, exportDate: Date.now(), notes: [], tags: [], highlights: [], youtubeLinks: [], noteTags: [] };
+  }
+  if (isDirty) saveNow();
+  const now = Date.now();
+  const note = { id: nextId++, title: 'New Note', content: '', createdAt: now, updatedAt: now };
+  backup.notes.unshift(note);
+  currentIndex = 0;
+  renderList();
+  selectNote(0);
+  setTimeout(() => { const t = document.getElementById('noteTitle'); t.focus(); t.select(); }, 50);
+}
+
+function deleteCurrentNote() {
+  if (mode === 'live') { liveDeleteCurrentNote(); return; }
+  if (!backup || currentIndex < 0) return;
+  const title = backup.notes[currentIndex].title || 'Untitled';
+  if (!confirm(`Delete "${title}"?`)) return;
+  backup.notes.splice(currentIndex, 1);
+  isDirty = false;
+  if (backup.notes.length === 0) {
+    currentIndex = -1;
+    document.getElementById('editorWrap').classList.remove('show');
+    document.getElementById('emptyState').style.display = '';
+  } else {
+    currentIndex = Math.min(currentIndex, backup.notes.length - 1);
+    selectNote(currentIndex);
+  }
+  renderList();
+  toast('🗑 Note deleted');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SAVE (JSON mode)
+// ══════════════════════════════════════════════════════════════════════════════
+function saveNow() {
+  if (mode === 'live') { liveSaveCurrentNote(); return; }
+  if (!backup || currentIndex < 0) return;
+  const note = backup.notes[currentIndex];
+  note.title    = document.getElementById('noteTitle').value.trim() || 'Untitled';
+  note.content  = document.getElementById('richEditor').innerHTML;
+  note.updatedAt = Date.now();
+  isDirty = false;
+  setStatus('Saved', false);
+  renderList();
+}
+
+function markDirty() {
+  isDirty = true;
+  setStatus('● Unsaved', true);
+  updateWordCount();
+  scheduleAutoSave();
+  if (mode === 'json') persistToLocalStorage();
+}
+
+function setStatus(msg, dirty, extraClass) {
+  const el = document.getElementById('saveStatus');
+  el.textContent = msg;
+  el.className = dirty ? 'dirty' : (extraClass || '');
+}
+
+function updateWordCount() {
+  const txt = document.getElementById('richEditor').innerText || '';
+  const w = txt.trim().split(/\s+/).filter(x => x).length;
+  document.getElementById('wordCount').textContent = w + ' word' + (w !== 1 ? 's' : '');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EXPORT (works for both modes — exports current notes as JSON)
+// ══════════════════════════════════════════════════════════════════════════════
+function exportJSON() {
+  if (!backup) { toast('❌ No data to export'); return; }
+  if (isDirty && mode === 'json') saveNow();
+  backup.exportDate = Date.now();
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'scriptorium_backup_' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('✓ Exported successfully');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FORMATTING
+// ══════════════════════════════════════════════════════════════════════════════
+function applyFmt(cmd) {
+  document.getElementById('richEditor').focus();
+  document.execCommand(cmd, false, null);
+  markDirty();
+  updateToolbarState();
+}
+
+function applyHeading() {
+  const ed = document.getElementById('richEditor');
+  ed.focus();
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  let node = range.commonAncestorContainer;
+  if (node.nodeType === 3) node = node.parentNode;
+  const existingSpan = node.closest ? node.closest('span[data-heading]') : null;
+  if (existingSpan) {
+    const parent = existingSpan.parentNode;
+    while (existingSpan.firstChild) parent.insertBefore(existingSpan.firstChild, existingSpan);
+    parent.removeChild(existingSpan);
+    document.getElementById('btn-heading').classList.remove('active');
+  } else {
+    if (range.collapsed) {
+      document.execCommand('fontSize', false, '5');
+      document.execCommand('bold', false, null);
+    } else {
+      const span = document.createElement('span');
+      span.setAttribute('data-heading', '1');
+      span.style.cssText = 'font-size:20px;font-weight:bold';
+      try { range.surroundContents(span); } catch(e) { document.execCommand('bold', false, null); }
+    }
+    document.getElementById('btn-heading').classList.add('active');
+  }
+  markDirty();
+}
+
+// ── Color ──────────────────────────────────────────────────────────────────
+function togglePalette(type) {
+  saveSelection();
+  if (activePalette === type) { closePalette(); }
+  else {
+    activePalette = type;
+    document.getElementById('colorPalette').classList.toggle('show', type === 'color');
+    document.getElementById('highlightPalette').classList.toggle('show', type === 'highlight');
+    document.getElementById('btn-color').classList.toggle('active', type === 'color');
+    document.getElementById('btn-highlight').classList.toggle('active', type === 'highlight');
+  }
+}
+
+function closePalette() {
+  activePalette = null;
+  document.getElementById('colorPalette').classList.remove('show');
+  document.getElementById('highlightPalette').classList.remove('show');
+  document.getElementById('btn-color').classList.remove('active');
+  document.getElementById('btn-highlight').classList.remove('active');
+}
+
+function saveSelection() {
+  const sel = window.getSelection();
+  if (sel.rangeCount > 0) savedRange = sel.getRangeAt(0).cloneRange();
+}
+
+function restoreSelection() {
+  if (!savedRange) return;
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(savedRange);
+}
+
+function applyColor(hex) {
+  restoreSelection();
+  document.getElementById('richEditor').focus();
+  document.execCommand('styleWithCSS', false, true);
+  document.execCommand('foreColor', false, hex);
+  closePalette();
+  markDirty();
+}
+
+function clearColor() {
+  restoreSelection();
+  document.getElementById('richEditor').focus();
+  document.execCommand('styleWithCSS', false, false);
+  document.execCommand('foreColor', false, 'inherit');
+  document.execCommand('removeFormat', false, null);
+  closePalette();
+  markDirty();
+}
+
+function applyHighlight(hex) {
+  restoreSelection();
+  document.getElementById('richEditor').focus();
+  document.execCommand('styleWithCSS', false, true);
+  document.execCommand('hiliteColor', false, hex);
+  closePalette();
+  markDirty();
+}
+
+function clearHighlight() {
+  restoreSelection();
+  document.getElementById('richEditor').focus();
+  document.execCommand('styleWithCSS', false, true);
+  document.execCommand('hiliteColor', false, 'transparent');
+  closePalette();
+  markDirty();
+}
+
+function clearFmt() {
+  document.getElementById('richEditor').focus();
+  document.execCommand('removeFormat', false, null);
+  document.getElementById('btn-heading').classList.remove('active');
+  closePalette();
+  markDirty();
+}
+
+// ── Toolbar active state ───────────────────────────────────────────────────
+function updateToolbarState() {
+  document.getElementById('btn-bold').classList.toggle('active', document.queryCommandState('bold'));
+  document.getElementById('btn-italic').classList.toggle('active', document.queryCommandState('italic'));
+  document.getElementById('btn-underline').classList.toggle('active', document.queryCommandState('underline'));
+  document.getElementById('btn-strike').classList.toggle('active', document.queryCommandState('strikeThrough'));
+  document.getElementById('btn-ul').classList.toggle('active', document.queryCommandState('insertUnorderedList'));
+  document.getElementById('btn-ol').classList.toggle('active', document.queryCommandState('insertOrderedList'));
+}
+
+document.getElementById('richEditor').addEventListener('keyup', updateToolbarState);
+document.getElementById('richEditor').addEventListener('mouseup', updateToolbarState);
+document.getElementById('richEditor').addEventListener('selectionchange', updateToolbarState);
+
+// ── Editor key handler ─────────────────────────────────────────────────────
+function handleEditorKey(e) {
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key === 's') {
+    e.preventDefault();
+    if (mode === 'live') liveSaveCurrentNote();
+    else { saveNow(); toast('✓ Saved'); }
+    return;
+  }
+  if (mod && e.key === 'b') { e.preventDefault(); applyFmt('bold'); return; }
+  if (mod && e.key === 'i') { e.preventDefault(); applyFmt('italic'); return; }
+  if (mod && e.key === 'u') { e.preventDefault(); applyFmt('underline'); return; }
+  if (e.key === 'Tab') { e.preventDefault(); document.execCommand('insertHTML', false, '    '); }
+}
+
+function onEditorInput() { markDirty(); updateToolbarState(); }
+
+// ── Global keyboard shortcuts ──────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key === 'n') { e.preventDefault(); addNote(); }
+});
+
+// ── Auto-save on blur ──────────────────────────────────────────────────────
+document.getElementById('richEditor').addEventListener('blur', () => {
+  if (!isDirty) return;
+  if (mode === 'live') liveSaveCurrentNote();
+  else saveNow();
+});
+document.getElementById('noteTitle').addEventListener('blur', () => {
+  if (!isDirty) return;
+  if (mode === 'live') liveSaveCurrentNote();
+  else saveNow();
+});
+document.getElementById('noteTitle').addEventListener('input', markDirty);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════════════════════════
+function fmtDate(ts) {
+  if (!ts) return '';
+  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function stripHtml(s) { const d = document.createElement('div'); d.innerHTML = s; return d.textContent || ''; }
+
+window.addEventListener('beforeunload', e => {
+  if (isDirty && !fileHandle && mode === 'json') {
+    e.preventDefault(); e.returnValue = '';
+  }
+});
+
+window.addEventListener('load', () => { checkLocalStorage(); });
+
+let toastTimer;
+function toast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type === 'live' ? ' live' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+</script>
+</body>
+</html>
