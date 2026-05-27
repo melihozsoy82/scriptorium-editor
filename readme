@@ -1,0 +1,15 @@
+## Scriptorium Editor
+
+A desktop HTML editor for [Scriptorium](https://play.google.com/store/apps/details?id=com.melihozsoy.biblicalnotes) note backups.
+
+### Download
+👉 [**Download scriptorium-editor.html**](https://github.com/melihozsoy82/scriptorium-editor/raw/main/scriptorium-editor.html)
+
+### Live version
+https://melihozsoy82.github.io/scriptorium-editor/scriptorium-editor.html
+
+### Usage
+1. Enable **Developer Mode** in Scriptorium Settings
+2. Connect phone via USB
+3. Run: `adb forward tcp:8765 tcp:8765`
+4. Open the editor → click **🔌 Live** → Connect
