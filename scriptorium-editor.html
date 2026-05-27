@@ -312,6 +312,52 @@ header h1 { font-size: 16px; color: var(--gold); font-weight: 700; flex: 1; lett
 .rich-editor ol { margin-left: 22px; }
 .rich-editor li { margin: 2px 0; }
 .rich-editor b, .rich-editor strong { color: inherit; }
+.rich-editor table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+.rich-editor td, .rich-editor th { border: 1px solid #2d6b52; padding: 7px 10px; min-width: 60px; word-break: break-word; }
+.rich-editor tr:first-child td { background: rgba(61,122,95,.18); font-weight: 600; }
+
+/* ── Table picker popup ───────────────────────────────────────────── */
+.table-picker-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.table-picker {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  z-index: 300;
+  box-shadow: 0 6px 24px rgba(0,0,0,.5);
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.table-picker.show { display: flex; }
+.table-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 22px);
+  gap: 3px;
+}
+.table-cell {
+  width: 22px; height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  background: var(--surface);
+  transition: background .08s, border-color .08s;
+}
+.table-cell.lit { background: var(--accent); border-color: var(--accent2); }
+.table-picker-label {
+  font-size: 11px;
+  color: var(--muted);
+  pointer-events: none;
+}
 
 /* Status bar */
 .statusbar {
@@ -453,6 +499,15 @@ header h1 { font-size: 16px; color: var(--gold); font-weight: 700; flex: 1; lett
           <button class="tb" id="btn-ol" title="Numbered List" onclick="applyFmt('insertOrderedList')">
             <svg viewBox="0 0 24 24"><path d="M2 17h2v.5H3v1h1v.5H2v1h3v-4H2zm1-9h1V4H2v1h1zm-1 3h1.8L2 13.1v.9h3v-1H3.2L5 10.9V10H2zm5-5v2h14V6zm0 14h14v-2H7zm0-6h14v-2H7z"/></svg>
           </button>
+          <div class="table-picker-wrap">
+            <button class="tb" id="btn-table" title="Insert Table" onclick="toggleTablePicker(event)">
+              <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm16 16V5H5v14h14zM7 7h4v2H7V7zm6 0h4v2h-4V7zM7 11h4v2H7v-2zm6 0h4v2h-4v-2zM7 15h4v2H7v-2zm6 0h4v2h-4v-2z"/></svg>
+            </button>
+            <div class="table-picker" id="tablePicker">
+              <div class="table-grid" id="tableGrid"></div>
+              <div class="table-picker-label" id="tablePickerLabel">Select table size</div>
+            </div>
+          </div>
           <div class="tsep"></div>
           <button class="tb" title="Clear Formatting" onclick="clearFmt()">
             <svg viewBox="0 0 24 24"><path d="M3.27 5L2 6.27l6.97 6.97L6.5 19h3l1.57-3.66L16.73 21 18 19.73 3.27 5zm13.85-2L12 8.12 7.88 4 6.44 5.44 10.56 9.56 6.88 13H5v2h3.12l-2 4.71 1.41 1.41L9.88 17H11v-1.12l3.56-3.56 4.12 4.12L20 15.15 17.12 12.27 20.56 8.83 19.12 7.39 15.68 10.83 13.12 8.27 17.12 4.27 15.12 3z"/></svg>
@@ -1109,6 +1164,77 @@ function clearFmt() {
   closePalette();
   markDirty();
 }
+
+// ── Table picker ───────────────────────────────────────────────────────────
+(function initTablePicker() {
+  const grid = document.getElementById('tableGrid');
+  const ROWS = 6, COLS = 6;
+  let hoverR = 0, hoverC = 0;
+
+  for (let r = 1; r <= ROWS; r++) {
+    for (let c = 1; c <= COLS; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'table-cell';
+      cell.dataset.r = r;
+      cell.dataset.c = c;
+      cell.addEventListener('mouseenter', () => { hoverR = r; hoverC = c; updateGrid(); });
+      cell.addEventListener('click', () => { insertTable(r, c); hideTablePicker(); });
+      grid.appendChild(cell);
+    }
+  }
+
+  function updateGrid() {
+    grid.querySelectorAll('.table-cell').forEach(cell => {
+      const r = +cell.dataset.r, c = +cell.dataset.c;
+      cell.classList.toggle('lit', r <= hoverR && c <= hoverC);
+    });
+    document.getElementById('tablePickerLabel').textContent =
+      hoverR > 0 ? `${hoverR} × ${hoverC} table` : 'Select table size';
+  }
+
+  grid.addEventListener('mouseleave', () => { hoverR = 0; hoverC = 0; updateGrid(); });
+})();
+
+function toggleTablePicker(e) {
+  e.stopPropagation();
+  saveSelection();
+  const picker = document.getElementById('tablePicker');
+  const isOpen = picker.classList.contains('show');
+  hideTablePicker();
+  if (!isOpen) {
+    picker.classList.add('show');
+    document.getElementById('btn-table').classList.add('active');
+  }
+}
+
+function hideTablePicker() {
+  document.getElementById('tablePicker').classList.remove('show');
+  document.getElementById('btn-table').classList.remove('active');
+}
+
+function insertTable(rows, cols) {
+  const cellStyle = 'border:1px solid #2d6b52;padding:7px 10px;min-width:60px;word-break:break-word';
+  const headerStyle = cellStyle + ';background:rgba(61,122,95,.18);font-weight:600';
+  let html = '<table style="border-collapse:collapse;width:100%;margin:8px 0"><tbody>';
+  for (let r = 0; r < rows; r++) {
+    html += '<tr>';
+    for (let c = 0; c < cols; c++) {
+      const style = r === 0 ? headerStyle : cellStyle;
+      html += `<td style="${style}">&nbsp;</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  restoreSelection();
+  document.getElementById('richEditor').focus();
+  document.execCommand('insertHTML', false, html);
+  markDirty();
+}
+
+// Close table picker when clicking outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.table-picker-wrap')) hideTablePicker();
+});
 
 // ── Toolbar active state ───────────────────────────────────────────────────
 function updateToolbarState() {
